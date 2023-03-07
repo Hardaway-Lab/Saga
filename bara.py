@@ -1,18 +1,3 @@
-"""
-    Parse the data
-X       1.  Open a CSV
-X       2.  Deinterleive the data
-X       3.  Smooth Data
-X       4.  Bi-exponential Fit
-X       5.  "Correct" the data
-X       6.  Extract Fed Events
-X       7.  Split on Events
-X       8.  Normalize Event Data
-X       9.  Average Across the Data
-        10. SEM
-        11. Stats???
-"""
-
 import numpy as np
 import pandas as pd
 import scipy
@@ -158,6 +143,49 @@ def time_to_index(
     Finds the closest index to a timestamps
     """
     return np.abs(data_frame[time_column_label] - time_stamp).argmin()
+
+
+def ttl_rising_edge(
+    data_frame: pd.DataFrame,
+    ttl_column_label: str
+) -> None:
+    """
+    Converts a TTL pulse in a specifed column to the rising edge only
+    """
+    rising = list(
+        map(
+            lambda a,b: 1 if a < b else 0,
+            data_frame[ttl_column_label].iloc[1:],
+            data_frame[ttl_column_label].iloc[:-1]
+        )
+    ) + [0]
+    data_frame[ttl_column_label] = rising
+
+def ttl_edge_count(
+    data_frame: pd.DataFrame,
+    ttl_column_label: str,
+    window_size: int,
+) -> None:
+    """
+    Counts the number of ttl pulses in a window size
+    """
+    ttl_rising_edge(data_frame,ttl_column_label)
+    counts = np.concatenate((np.zeros(window_size-1), np.convolve(data_frame[ttl_column_label],np.ones(window_size),'valid')))
+
+    for i in range(len(counts))[:0:-1]:
+        if counts[i-1] != 0:
+            counts[i-1] = max(counts[i],counts[i-1])
+
+    counts = list (
+        map(
+            lambda a,b: b if a < b else 0,
+            counts[:-1],
+            counts[1:]
+        )
+    ) + [0]
+
+    data_frame[ttl_column_label] = counts
+
 
 
 def fed_events(
